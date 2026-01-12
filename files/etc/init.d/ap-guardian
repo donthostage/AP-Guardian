@@ -1,0 +1,64 @@
+#!/bin/sh /etc/rc.common
+# Copyright (C) 2024 AP-Guardian
+# AP-Guardian init script
+
+START=99
+STOP=10
+
+SERVICE_USE_PID=1
+SERVICE_WRITE_PID=1
+SERVICE_DAEMONIZE=1
+
+SERVICE_NAME="ap-guardian"
+SERVICE_BIN="/usr/bin/ap-guardian"
+SERVICE_PID_FILE="/var/run/ap-guardian.pid"
+SERVICE_LOG_FILE="/var/log/ap-guardian.log"
+
+start_service() {
+    if [ ! -f "$SERVICE_BIN" ]; then
+        echo "Error: $SERVICE_BIN not found"
+        exit 1
+    fi
+    
+    # Проверка прав root
+    if [ "$(id -u)" != "0" ]; then
+        echo "Error: AP-Guardian requires root privileges"
+        exit 1
+    fi
+    
+    # Создание директорий
+    mkdir -p /etc/ap-guardian
+    mkdir -p /var/log
+    
+    # Конвертация конфигурации UCI в JSON
+    if [ -f /etc/config/ap-guardian ]; then
+        python3 /usr/lib/ap-guardian/uci_to_json.py
+    fi
+    
+    service_start $SERVICE_BIN
+    echo "AP-Guardian started"
+}
+
+stop_service() {
+    service_stop $SERVICE_BIN
+    echo "AP-Guardian stopped"
+}
+
+restart() {
+    stop
+    sleep 2
+    start
+}
+
+reload() {
+    # Перезагрузка конфигурации
+    if [ -f /etc/config/ap-guardian ]; then
+        python3 /usr/lib/ap-guardian/uci_to_json.py
+    fi
+    # Отправка сигнала SIGHUP для перезагрузки конфигурации
+    kill -HUP $(cat $SERVICE_PID_FILE 2>/dev/null) 2>/dev/null || true
+}
+
+status() {
+    service_status $SERVICE_BIN
+}

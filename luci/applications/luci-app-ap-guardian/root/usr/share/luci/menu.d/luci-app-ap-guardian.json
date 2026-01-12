@@ -1,0 +1,16 @@
+{
+    "admin/services/ap-guardian": {
+        "title": "AP-Guardian",
+        "order": 60,
+        "action": {
+            "type": "alias",
+            "path": "admin/services/ap-guardian/status"
+        },
+        "depends": {
+            "acl": [ "luci-app-ap-guardian" ],
+            "fs": {
+                "/usr/bin/ap-guardian": "executable"
+            }
+        }
+    }
+}

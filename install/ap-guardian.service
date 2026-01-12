@@ -1,0 +1,25 @@
+[Unit]
+Description=AP-Guardian - Active Network Protection System
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStart=/usr/bin/python3 /usr/lib/ap-guardian/main.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Ограничения ресурсов
+MemoryLimit=100M
+CPUQuota=30%
+
+# Безопасность
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

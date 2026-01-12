@@ -1,0 +1,55 @@
+/**
+ * CSS стили для страницы статуса AP-Guardian
+ */
+
+.status-running {
+    color: #00aa00;
+    font-weight: bold;
+}
+
+.status-stopped {
+    color: #aa0000;
+    font-weight: bold;
+}
+
+.status-item {
+    margin: 10px 0;
+    padding: 10px;
+    background: #f5f5f5;
+    border-radius: 4px;
+}
+
+.threat-item {
+    margin: 10px 0;
+    padding: 15px;
+    border-radius: 4px;
+    border-left: 4px solid #ccc;
+}
+
+.threat-critical {
+    background: #ffe6e6;
+    border-left-color: #ff0000;
+}
+
+.threat-high {
+    background: #fff3e6;
+    border-left-color: #ff6600;
+}
+
+.threat-medium {
+    background: #fffce6;
+    border-left-color: #ffcc00;
+}
+
+.threat-low {
+    background: #e6f3ff;
+    border-left-color: #0066cc;
+}
+
+.block-item {
+    margin: 10px 0;
+    padding: 15px;
+    background: #f5f5f5;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+}

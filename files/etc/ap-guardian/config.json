@@ -1,0 +1,92 @@
+{
+  "general": {
+    "enabled": true,
+    "log_level": "INFO",
+    "log_file": "/var/log/ap-guardian.log",
+    "check_interval": 3,
+    "max_memory_mb": 50,
+    "max_cpu_percent": 30
+  },
+  "arp_spoofing": {
+    "enabled": true,
+    "check_interval": 3,
+    "threshold": 3,
+    "block_duration": 3600,
+    "trusted_devices": [],
+    "monitor_gateway": true
+  },
+  "ddos": {
+    "enabled": true,
+    "syn_flood": {
+      "enabled": true,
+      "syn_per_second_threshold": 100,
+      "syn_ack_ratio_threshold": 0.1,
+      "incomplete_connections_threshold": 50
+    },
+    "udp_flood": {
+      "enabled": true,
+      "packets_per_second_threshold": 1000,
+      "anomaly_detection": true
+    },
+    "icmp_flood": {
+      "enabled": true,
+      "packets_per_second_threshold": 500,
+      "anomaly_detection": true
+    },
+    "adaptive_thresholds": true,
+    "count_min_sketch_depth": 4,
+    "count_min_sketch_width": 2048
+  },
+  "network_scan": {
+    "enabled": true,
+    "horizontal_scan": {
+      "enabled": true,
+      "hosts_threshold": 10,
+      "time_window": 60
+    },
+    "vertical_scan": {
+      "enabled": true,
+      "ports_threshold": 20,
+      "time_window": 60
+    },
+    "known_scanners": ["nmap", "masscan"]
+  },
+  "firewall": {
+    "enabled": true,
+    "auto_block": true,
+    "rate_limit": true,
+    "rate_limit_packets": 100,
+    "rate_limit_seconds": 1,
+    "whitelist": [],
+    "blacklist": []
+  },
+  "bruteforce": {
+    "enabled": true,
+    "failed_attempts_threshold": 5,
+    "time_window": 300,
+    "ports_to_monitor": [22, 23, 80, 443, 3306, 5432]
+  },
+  "notifications": {
+    "enabled": false,
+    "min_threat_level": "MEDIUM",
+    "cooldown_seconds": 300,
+    "email": {
+      "enabled": false,
+      "smtp_server": "smtp.gmail.com",
+      "smtp_port": 587,
+      "username": "",
+      "password": "",
+      "from": "",
+      "to": []
+    },
+    "webhook": {
+      "enabled": false,
+      "url": "",
+      "headers": {}
+    },
+    "script": {
+      "enabled": false,
+      "path": ""
+    }
+  }
+}

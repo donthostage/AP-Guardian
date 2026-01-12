@@ -1,0 +1,17 @@
+# Локальный Makefile для разработки
+
+.PHONY: install clean test
+
+install:
+	pip3 install -r requirements.txt
+
+clean:
+	find . -type d -name __pycache__ -exec rm -r {} + 2>/dev/null || true
+	find . -type f -name "*.pyc" -delete
+	find . -type f -name "*.pyo" -delete
+
+test:
+	python3 -m pytest tests/ -v
+
+run:
+	sudo python3 -m src.main
