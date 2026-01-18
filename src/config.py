@@ -97,6 +97,11 @@ class Config:
                 "url": "",
                 "headers": {}
             },
+            "telegram": {
+                "enabled": False,
+                "bot_token": "",
+                "chat_id": ""
+            },
             "script": {
                 "enabled": False,
                 "path": ""

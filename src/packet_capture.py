@@ -129,12 +129,15 @@ class PacketCapture:
                         "tcp_flags": flags
                     })
                     
-                    # SYN пакет
-                    if flags & 0x02:
+                    # SYN пакет (флаг SYN установлен, ACK не установлен)
+                    # 0x02 = SYN, 0x10 = ACK, 0x12 = SYN+ACK
+                    if (flags & 0x02) and not (flags & 0x10):
+                        # Чистый SYN без ACK
                         if self.callback:
                             await self.callback("syn", **packet_info)
-                    # SYN-ACK пакет
-                    elif flags & 0x12:
+                    # SYN-ACK пакет (оба флага SYN и ACK установлены)
+                    elif (flags & 0x12) == 0x12:
+                        # SYN + ACK
                         if self.callback:
                             await self.callback("syn_ack", **packet_info)
                 
@@ -222,11 +225,14 @@ class PacketCapture:
                         "tcp_flags": tcp.flags
                     })
                     
-                    if tcp.flags == 2:  # SYN
+                    # TCP флаги: 0x02 = SYN, 0x10 = ACK, 0x12 = SYN+ACK
+                    # Проверяем флаги правильно
+                    tcp_flags = tcp.flags
+                    if (tcp_flags & 0x02) and not (tcp_flags & 0x10):  # SYN без ACK
                         asyncio.create_task(
                             self.callback("syn", **packet_info)
                         )
-                    elif tcp.flags == 18:  # SYN-ACK
+                    elif (tcp_flags & 0x12) == 0x12:  # SYN + ACK
                         asyncio.create_task(
                             self.callback("syn_ack", **packet_info)
                         )

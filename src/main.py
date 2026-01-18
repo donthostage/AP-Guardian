@@ -56,7 +56,8 @@ class APGuardian:
         """Настройка обработчиков сигналов"""
         def signal_handler(sig, frame):
             logger.info("Получен сигнал остановки")
-            asyncio.create_task(self.stop())
+            # Устанавливаем флаг для остановки (обработка будет в основном цикле)
+            self.running = False
         
         signal.signal(signal.SIGINT, signal_handler)
         signal.signal(signal.SIGTERM, signal_handler)
@@ -187,11 +188,19 @@ class APGuardian:
                     )
             
             # Обработка Bruteforce детектором
-            if self.bruteforce_detector and dst_port:
-                if packet_type == "syn":
-                    # Для SYN пакетов считаем как попытку подключения
-                    # Успешность определяется по наличию SYN-ACK
+            if self.bruteforce_detector:
+                if packet_type == "syn" and dst_port:
+                    # Для SYN пакетов считаем как попытку подключения (пока неуспешную)
                     self.bruteforce_detector.process_connection(src_ip, dst_ip, dst_port, success=False)
+                elif packet_type == "syn_ack":
+                    # SYN-ACK означает успешное соединение
+                    # В SYN-ACK: 
+                    #   src_ip/src_port - сервер (куда был SYN)
+                    #   dst_ip/dst_port - клиент (кто отправил SYN)
+                    # Для отслеживания попыток к серверу используем src_port (порт сервера)
+                    src_port = kwargs.get("src_port")
+                    if src_port:
+                        self.bruteforce_detector.process_connection(dst_ip, src_ip, src_port, success=True)
         
         except Exception as e:
             logger.debug(f"Ошибка обработки пакета: {e}")
@@ -245,7 +254,10 @@ class APGuardian:
         if not self.firewall_manager:
             return
         
-        block_duration = self.config.get("arp_spoofing", "block_duration", default=3600)
+        block_duration = self.config.get("firewall", "block_duration", default=3600)
+        
+        # Отслеживание уже обработанных угроз в этой итерации
+        processed_ips = set()
         
         for threat in threats:
             threat_type = threat.get("type", "")
@@ -287,8 +299,8 @@ class APGuardian:
             elif threat_type in ["horizontal_scan", "vertical_scan", "combined_scan", "bruteforce"]:
                 ip_to_block = threat.get("src_ip")
             
-            # Блокировка IP
-            if ip_to_block and self.firewall_manager:
+            # Блокировка IP (только если еще не был обработан в этой итерации)
+            if ip_to_block and self.firewall_manager and ip_to_block not in processed_ips:
                 success = await self.firewall_manager.block_ip(
                     ip_to_block,
                     duration=block_duration,
@@ -296,6 +308,18 @@ class APGuardian:
                 )
                 if success:
                     self.statistics.record_block(ip_to_block)
+                    processed_ips.add(ip_to_block)
+                    reason = f"{threat_type}: {threat.get('description', 'Threat detected')}"
+                    logger.warning(
+                        f"✓ IP {ip_to_block} заблокирован через firewall. "
+                        f"Причина: {reason}"
+                    )
+                    
+                    # Отправка уведомления о блокировке
+                    if self.notification_manager:
+                        await self.notification_manager.send_block_notification(
+                            ip_to_block, reason, threat_type
+                        )
     
     async def stop(self) -> None:
         """Остановка системы"""

@@ -84,6 +84,11 @@
       "url": "",
       "headers": {}
     },
+    "telegram": {
+      "enabled": false,
+      "bot_token": "",
+      "chat_id": ""
+    },
     "script": {
       "enabled": false,
       "path": ""

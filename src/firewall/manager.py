@@ -157,18 +157,35 @@ class FirewallManager:
             return True
         
         try:
-            # Блокировка через iptables
-            await self._run_command([
-                "iptables", "-A", self.iptables_chain,
+            # Проверка, существует ли уже правило (для предотвращения дубликатов)
+            # Используем -C (check), если правило существует - пропускаем
+            rule_exists = await self._run_command([
+                "iptables", "-C", self.iptables_chain,
                 "-s", ip,
                 "-j", "DROP"
-            ])
+            ], ignore_errors=True)
             
-            await self._run_command([
-                "iptables", "-A", self.iptables_chain_forward,
+            if not rule_exists:
+                # Блокировка через iptables (INSERT в начало для приоритета)
+                await self._run_command([
+                    "iptables", "-I", self.iptables_chain, "1",
+                    "-s", ip,
+                    "-j", "DROP"
+                ])
+            
+            # Аналогично для FORWARD цепочки
+            rule_exists_forward = await self._run_command([
+                "iptables", "-C", self.iptables_chain_forward,
                 "-s", ip,
                 "-j", "DROP"
-            ])
+            ], ignore_errors=True)
+            
+            if not rule_exists_forward:
+                await self._run_command([
+                    "iptables", "-I", self.iptables_chain_forward, "1",
+                    "-s", ip,
+                    "-j", "DROP"
+                ])
             
             # Сохранение информации о блокировке
             self.active_blocks[ip] = {

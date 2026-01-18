@@ -5,6 +5,9 @@
 import asyncio
 import smtplib
 import json
+import time
+from collections import deque
+from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import Dict, List, Optional
@@ -54,6 +57,12 @@ class NotificationManager:
         self.script_enabled = script_config.get("enabled", False)
         self.script_path = script_config.get("path", "")
         
+        # Telegram настройки
+        telegram_config = config.get("telegram", {})
+        self.telegram_enabled = telegram_config.get("enabled", False)
+        self.telegram_bot_token = telegram_config.get("bot_token", "")
+        self.telegram_chat_id = telegram_config.get("chat_id", "")  # Admin ID
+        
         # Минимальный уровень угрозы для уведомления
         self.min_threat_level = config.get("min_threat_level", "MEDIUM")
         
@@ -92,6 +101,9 @@ class NotificationManager:
         if self.webhook_enabled:
             tasks.append(self._send_webhook(threat))
         
+        if self.telegram_enabled:
+            tasks.append(self._send_telegram(threat))
+        
         if self.script_enabled:
             tasks.append(self._run_script(threat))
         
@@ -109,7 +121,6 @@ class NotificationManager:
     
     def _record_notification(self, threat_id: str) -> None:
         """Запись отправленного уведомления"""
-        import time
         self.notification_history.append((time.time(), threat_id))
     
     async def _send_email(self, threat: Dict) -> None:
@@ -174,6 +185,143 @@ IP источника: {threat.get('src_ip', 'Unknown')}
             logger.info(f"Webhook уведомление отправлено о угрозе {threat.get('type')}")
         except Exception as e:
             logger.error(f"Ошибка отправки webhook: {e}")
+    
+    async def _send_telegram(self, threat: Dict) -> None:
+        """Отправка Telegram уведомления"""
+        if not REQUESTS_AVAILABLE:
+            logger.warning("requests не установлен, Telegram уведомления недоступны")
+            return
+        
+        if not self.telegram_bot_token or not self.telegram_chat_id:
+            logger.warning("Telegram bot_token или chat_id не настроены")
+            return
+        
+        try:
+            threat_type = threat.get('type', 'Unknown')
+            threat_level = threat.get('threat_level', 'UNKNOWN')
+            src_ip = threat.get('src_ip', 'Unknown')
+            description = threat.get('description', 'No description')
+            timestamp = threat.get('timestamp', datetime.now().isoformat())
+            
+            # Эмодзи в зависимости от уровня угрозы
+            emoji_map = {
+                'CRITICAL': '🚨',
+                'HIGH': '⚠️',
+                'MEDIUM': '🔶',
+                'LOW': 'ℹ️'
+            }
+            emoji = emoji_map.get(threat_level, '📢')
+            
+            # Форматирование сообщения
+            message = f"""{emoji} <b>AP-Guardian: Обнаружена угроза</b>
+
+<b>Тип:</b> {threat_type}
+<b>Уровень:</b> {threat_level}
+<b>IP источника:</b> <code>{src_ip}</code>
+<b>Описание:</b> {description}
+<b>Время:</b> {timestamp}"""
+            
+            # Добавление дополнительной информации в зависимости от типа угрозы
+            if threat_type == 'bruteforce':
+                dst_ip = threat.get('dst_ip', 'Unknown')
+                dst_port = threat.get('dst_port', 'Unknown')
+                failed_attempts = threat.get('failed_attempts', 0)
+                message += f"\n\n<b>Цель:</b> {dst_ip}:{dst_port}"
+                message += f"\n<b>Неудачных попыток:</b> {failed_attempts}"
+            elif threat_type.startswith('ddos_'):
+                packets_per_sec = threat.get('packets_per_second', 0)
+                message += f"\n\n<b>Пакетов/сек:</b> {packets_per_sec}"
+            elif threat_type in ['horizontal_scan', 'vertical_scan']:
+                if threat_type == 'horizontal_scan':
+                    hosts_scanned = threat.get('hosts_scanned', 0)
+                    target_port = threat.get('target_port', 'Unknown')
+                    message += f"\n\n<b>Сканировано хостов:</b> {hosts_scanned}"
+                    message += f"\n<b>Целевой порт:</b> {target_port}"
+                else:
+                    ports_scanned = threat.get('ports_scanned', 0)
+                    message += f"\n\n<b>Сканировано портов:</b> {ports_scanned}"
+            elif threat_type == 'arp_spoofing':
+                ip = threat.get('ip', 'Unknown')
+                macs = threat.get('macs', [])
+                message += f"\n\n<b>IP:</b> {ip}"
+                message += f"\n<b>MAC адреса:</b> {', '.join(macs[:3])}"
+            
+            # Отправка через Telegram Bot API
+            api_url = f"https://api.telegram.org/bot{self.telegram_bot_token}/sendMessage"
+            
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(
+                None,
+                lambda: requests.post(
+                    api_url,
+                    json={
+                        "chat_id": self.telegram_chat_id,
+                        "text": message,
+                        "parse_mode": "HTML",
+                        "disable_web_page_preview": True
+                    },
+                    timeout=10
+                )
+            )
+            
+            if response.status_code == 200:
+                logger.info(f"Telegram уведомление отправлено о угрозе {threat_type}")
+            else:
+                logger.error(f"Ошибка отправки Telegram: {response.status_code} - {response.text}")
+                
+        except Exception as e:
+            logger.error(f"Ошибка отправки Telegram уведомления: {e}")
+    
+    async def send_block_notification(self, ip: str, reason: str, threat_type: str = "Unknown") -> None:
+        """
+        Отправка уведомления о блокировке IP
+        
+        Args:
+            ip: Заблокированный IP
+            reason: Причина блокировки
+            threat_type: Тип угрозы
+        """
+        if not self.enabled or not self.telegram_enabled:
+            return
+        
+        if not self.telegram_bot_token or not self.telegram_chat_id:
+            return
+        
+        try:
+            timestamp = datetime.now().isoformat()
+            
+            message = f"""🛡️ <b>AP-Guardian: IP заблокирован</b>
+
+<b>IP:</b> <code>{ip}</code>
+<b>Тип угрозы:</b> {threat_type}
+<b>Причина:</b> {reason}
+<b>Время:</b> {timestamp}
+<b>Статус:</b> ✅ Заблокирован через firewall"""
+            
+            api_url = f"https://api.telegram.org/bot{self.telegram_bot_token}/sendMessage"
+            
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(
+                None,
+                lambda: requests.post(
+                    api_url,
+                    json={
+                        "chat_id": self.telegram_chat_id,
+                        "text": message,
+                        "parse_mode": "HTML",
+                        "disable_web_page_preview": True
+                    },
+                    timeout=10
+                )
+            )
+            
+            if response.status_code == 200:
+                logger.info(f"Telegram уведомление о блокировке {ip} отправлено")
+            else:
+                logger.error(f"Ошибка отправки Telegram блокировки: {response.status_code}")
+                
+        except Exception as e:
+            logger.error(f"Ошибка отправки Telegram уведомления о блокировке: {e}")
     
     async def _run_script(self, threat: Dict) -> None:
         """Запуск скрипта уведомления"""

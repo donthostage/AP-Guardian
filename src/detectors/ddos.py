@@ -180,6 +180,9 @@ class DDoSDetector:
         elif packet_type == "syn_ack" and self.syn_enabled:
             self.syn_ack_packets.append((current_time, dst_ip))
             self.syn_ack_packets_by_ip[dst_ip].append(current_time)
+            # SYN-ACK приходит от сервера (src_ip) к клиенту (dst_ip)
+            # Уменьшаем счетчик незавершенных соединений для клиента (dst_ip)
+            # который отправил SYN
             if dst_ip in self.incomplete_connections:
                 self.incomplete_connections[dst_ip] = max(0, self.incomplete_connections[dst_ip] - 1)
         

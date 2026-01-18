@@ -27,12 +27,12 @@
 - scapy (для анализа пакетов)
 - requests (для webhook уведомлений)
 
-## Быстрая установка на Ubuntu
+## Быстрая установка на Ubuntu/Debian
 
 ```bash
 # Клонирование репозитория
 git clone <repository_url>
-cd ap-guardian
+cd AP-Guardian
 
 # Установка
 sudo bash install_ubuntu.sh
@@ -44,6 +44,8 @@ sudo systemctl enable ap-guardian
 # Проверка статуса
 sudo systemctl status ap-guardian
 ```
+
+**Подробная инструкция:** См. [INSTALL_UBUNTU.md](INSTALL_UBUNTU.md) для детальных инструкций по установке и настройке на Ubuntu/Debian.
 
 ## Установка на OpenWrt
 
@@ -59,7 +61,25 @@ opkg install ap-guardian_*.ipk
 
 Основной конфигурационный файл: `/etc/ap-guardian/config.json`
 
-Пример настройки уведомлений:
+### Пример настройки Telegram уведомлений
+
+```json
+{
+  "notifications": {
+    "enabled": true,
+    "min_threat_level": "MEDIUM",
+    "telegram": {
+      "enabled": true,
+      "bot_token": "YOUR_BOT_TOKEN",
+      "chat_id": "YOUR_ADMIN_ID"
+    }
+  }
+}
+```
+
+**📱 Подробная инструкция:** См. [TELEGRAM_SETUP.md](TELEGRAM_SETUP.md)
+
+### Пример настройки Email уведомлений
 
 ```json
 {
@@ -101,7 +121,8 @@ cat /var/run/ap-guardian-status.json | python3 -m json.tool
 
 ## Документация
 
-- [INSTALL.md](INSTALL.md) - Инструкция по установке
+- [INSTALL_UBUNTU.md](INSTALL_UBUNTU.md) - Инструкция по установке на Ubuntu/Debian
+- [INSTALL.md](INSTALL.md) - Инструкция по установке на OpenWrt
 - [USAGE.md](USAGE.md) - Руководство по использованию
 - [TESTING.md](TESTING.md) - Руководство по тестированию
 - [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) - Структура проекта

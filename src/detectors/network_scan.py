@@ -119,6 +119,9 @@ class NetworkScanDetector:
         # Проверка вертикального сканирования
         if self.vertical_enabled:
             await self._check_vertical_scan(current_time)
+        
+        # Периодическая очистка старых данных
+        self._cleanup_old_data(current_time)
     
     async def _check_horizontal_scan(self, current_time: float) -> None:
         """Проверка горизонтального сканирования"""

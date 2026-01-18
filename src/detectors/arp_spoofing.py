@@ -99,7 +99,9 @@ class ARPSpoofingDetector:
         while self.running:
             try:
                 await self._check_arp_table()
-                await asyncio.sleep(self.check_interval)
+                # Используем минимальный интервал 1 секунда для более быстрого обнаружения
+                sleep_time = max(1, self.check_interval)
+                await asyncio.sleep(sleep_time)
             except Exception as e:
                 logger.error(f"Ошибка в цикле мониторинга ARP: {e}")
                 await asyncio.sleep(self.check_interval)

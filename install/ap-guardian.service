@@ -7,7 +7,11 @@ Wants=network.target
 Type=simple
 User=root
 Group=root
-ExecStart=/usr/bin/python3 /usr/lib/ap-guardian/main.py
+# Используем wrapper скрипт (создается автоматически или через setup.py)
+ExecStart=/usr/local/bin/ap-guardian
+# Альтернатива: ExecStart=/usr/bin/python3 -m src.main
+# Рабочая директория
+WorkingDirectory=/usr/lib/ap-guardian
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -17,9 +21,9 @@ StandardError=journal
 MemoryLimit=100M
 CPUQuota=30%
 
-# Безопасность
-NoNewPrivileges=true
-PrivateTmp=true
+# Переменные окружения
+Environment="PYTHONPATH=/usr/lib/ap-guardian"
+Environment="AP_GUARDIAN_INTERFACE=any"
 
 [Install]
 WantedBy=multi-user.target

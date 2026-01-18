@@ -24,13 +24,7 @@ apt-get install -y python3 python3-pip python3-dev \
 
 # Установка Python пакетов
 echo "Установка Python пакетов..."
-pip3 install scapy
-
-# Создание пользователя для службы (опционально)
-if ! id "ap-guardian" &>/dev/null; then
-    echo "Создание пользователя ap-guardian..."
-    useradd -r -s /bin/false ap-guardian
-fi
+pip3 install scapy requests
 
 # Создание директорий
 echo "Создание директорий..."
@@ -39,29 +33,58 @@ mkdir -p /var/log/ap-guardian
 mkdir -p /var/run/ap-guardian
 mkdir -p /usr/lib/ap-guardian
 
-# Копирование файлов
-echo "Копирование файлов..."
-cp -r src/* /usr/lib/ap-guardian/
-chmod +x /usr/lib/ap-guardian/main.py
+# Сохранение текущей директории
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# Создание символической ссылки
-ln -sf /usr/lib/ap-guardian/main.py /usr/bin/ap-guardian
-chmod +x /usr/bin/ap-guardian
+# Копирование исходного кода
+echo "Копирование исходного кода..."
+cp -r "${SCRIPT_DIR}/src" /usr/lib/ap-guardian/
+# Копируем также __init__.py из корня если есть
+if [ -f "${SCRIPT_DIR}/__init__.py" ]; then
+    cp "${SCRIPT_DIR}/__init__.py" /usr/lib/ap-guardian/ 2>/dev/null || true
+fi
+
+# Установка через setup.py для создания entry point
+echo "Установка Python пакета..."
+cd "${SCRIPT_DIR}" || exit 1
+pip3 install -e . 2>/dev/null || {
+    echo "Предупреждение: Не удалось установить через setup.py, используем wrapper скрипт"
+}
+
+# Создание альтернативной символической ссылки (если setup.py не сработал)
+if [ ! -f /usr/local/bin/ap-guardian ] && [ ! -f /usr/bin/ap-guardian ]; then
+    # Создаем wrapper скрипт
+    cat > /usr/local/bin/ap-guardian << 'EOF'
+#!/usr/bin/env python3
+import sys
+import os
+sys.path.insert(0, '/usr/lib/ap-guardian')
+os.chdir('/usr/lib/ap-guardian')
+from src.main import main
+if __name__ == '__main__':
+    main()
+EOF
+    chmod +x /usr/local/bin/ap-guardian
+fi
 
 # Копирование конфигурации
 if [ ! -f /etc/ap-guardian/config.json ]; then
-    cp files/etc/ap-guardian/config.json /etc/ap-guardian/
+    cp "${SCRIPT_DIR}/files/etc/ap-guardian/config.json" /etc/ap-guardian/
 fi
 
 # Установка systemd service
 echo "Установка systemd service..."
-cp install/ap-guardian.service /etc/systemd/system/
+cp "${SCRIPT_DIR}/install/ap-guardian.service" /etc/systemd/system/
 systemctl daemon-reload
 
-# Настройка прав
-chown -R ap-guardian:ap-guardian /etc/ap-guardian
-chown -R ap-guardian:ap-guardian /var/log/ap-guardian
-chown -R ap-guardian:ap-guardian /var/run/ap-guardian
+# Настройка прав (root владелец, так как требуется для работы с сетью)
+chown -R root:root /etc/ap-guardian
+chown -R root:root /usr/lib/ap-guardian
+chmod -R 755 /usr/lib/ap-guardian
+chmod 644 /etc/ap-guardian/config.json
+# Директории для логов и runtime
+mkdir -p /var/log/ap-guardian /var/run/ap-guardian
+chmod 755 /var/log/ap-guardian /var/run/ap-guardian
 
 # Настройка capabilities для захвата пакетов без root
 setcap cap_net_raw,cap_net_admin=eip /usr/bin/python3.9 2>/dev/null || \
